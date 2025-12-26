@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,7 +29,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.internal.composableLambda
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
                         SudokuBoard(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(8.dp),
+                                .padding(4.dp),
                             activeNumber = activeNumber,
                             isEditing = isEditing
                         )
@@ -102,6 +102,14 @@ fun SudokuBoard(modifier: Modifier = Modifier, activeNumber: Int, isEditing: Boo
         )
     }
 
+    val notes = remember {
+        List(9) { row ->
+            List(9) { col ->
+                mutableStateOf(emptySet<Int>())
+            }
+        }
+    }
+
     val givenCells = remember {
         buildSet {
             board.forEachIndexed { row, rowList ->
@@ -130,19 +138,31 @@ fun SudokuBoard(modifier: Modifier = Modifier, activeNumber: Int, isEditing: Boo
                     val isGivenCell = givenCells.contains(cellPosition)
                     SudokuCell(
                         value = board[row][col],
+                        notes = notes[row][col].value,
                         row = row,
                         col = col,
                         modifier = Modifier.weight(1f),
-                        isSelected = activeCell == Pair(row, col),
+                        isSelected = activeCell == cellPosition,
                         isGiven = isGivenCell,
                         onCellClick = {
                             activeCell = Pair(row, col)
 
-                            if (isEditing && !isGivenCell) {
-                                board[row][col] = activeNumber
+                            if (!isGivenCell) {
+
+                                if (isEditing) {
+                                    board[row][col] = activeNumber
+                                    notes[row][col].value = emptySet()
+                                } else {
+                                    if (board[row][col] == 0) {
+                                        val cellNotes = notes[row][col].value
+                                        if (cellNotes.contains(activeNumber))
+                                            notes[row][col].value = cellNotes - activeNumber
+                                        else
+                                            notes[row][col].value = cellNotes + activeNumber
+                                    }
+                                }
                             }
                         }
-
                     )
                 }
             }
@@ -153,6 +173,7 @@ fun SudokuBoard(modifier: Modifier = Modifier, activeNumber: Int, isEditing: Boo
 @Composable
 fun SudokuCell(
     value: Int,
+    notes: Set<Int>,
     row: Int,
     col: Int,
     isSelected: Boolean,
@@ -214,6 +235,64 @@ fun SudokuCell(
                 fontWeight = FontWeight.Bold,
                 color = if (isGiven) Color.Black else Color.Blue
             )
+        } else if (notes.isNotEmpty()) {
+            NotesGrid(notes)
+        }
+    }
+}
+
+@Composable
+fun NotesGrid(notes: Set<Int>) {
+    Column(
+       modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Row(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
+            NoteNumber(1, notes.contains(1))
+            NoteNumber(2, notes.contains(2))
+            NoteNumber(3, notes.contains(3))
+        }
+        Row(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
+            NoteNumber(4, notes.contains(4))
+            NoteNumber(5, notes.contains(5))
+            NoteNumber(6, notes.contains(6))
+        }
+        Row(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
+            NoteNumber(7, notes.contains(7))
+            NoteNumber(8, notes.contains(8))
+            NoteNumber(9, notes.contains(9))
+        }
+    }
+
+}
+
+@Composable
+fun RowScope.NoteNumber(number: Int, isPresent: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .weight(1f),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isPresent) {
+            Text(
+                text = number.toString(),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.Gray,
+                lineHeight = 10.sp,
+                style = androidx.compose.ui.text.TextStyle(
+                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                        includeFontPadding = false
+                    )
+                )
+            )
         }
     }
 }
@@ -268,15 +347,14 @@ fun ToggleEditing(
     onToggle: (Boolean) -> Unit
 ) {
     Box(
-        modifier = modifier
-            .padding(8.dp),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
                 .size(56.dp)
                 .background(
-                    color = if (isEditing) Color(0xFF2196F3) else Color.LightGray,
+                    color = if (!isEditing) Color(0xFF2196F3) else Color.LightGray,
                     shape = CircleShape
                 )
                 .clickable(
@@ -288,7 +366,7 @@ fun ToggleEditing(
             Icon(
                 imageVector = Icons.Default.Edit,
                 contentDescription = if (isEditing) "Editing Mode" else "Notes Mode",
-                tint = if (isEditing) Color.White else Color.Black,
+                tint = if (!isEditing) Color.White else Color.Black,
                 modifier = Modifier.size(32.dp)
             )
         }
